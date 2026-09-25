@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'ai-photoshoot/**'
+      - 'ai-photoshoot-v2/**'
       - '.github/workflows/ai-photoshoot-pages.yml'
   workflow_dispatch:
 permissions:
@@ -29,7 +29,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ai-photoshoot
+          path: ai-photoshoot-v2
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
