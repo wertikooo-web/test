@@ -1,0 +1,22 @@
+name: Fix Gemini endpoint
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-v1beta.yml'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch endpoint
+        run: sed -i 's#https://generativelanguage.googleapis.com/v1/models/gemini-3-pro-image:generateContent#https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent#g' ai-photoshoot/index.html
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ai-photoshoot/index.html
+          git commit -m 'Use v1beta for image format options' || exit 0
+          git push
