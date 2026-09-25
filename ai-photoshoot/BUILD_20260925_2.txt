@@ -1,0 +1,1 @@
+Deploy upgraded AI Photoshoot with 2/4/8 outputs, per-image controls, ZIP download, editing, and resolution selection.
