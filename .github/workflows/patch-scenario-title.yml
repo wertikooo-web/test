@@ -1,0 +1,22 @@
+name: Patch scenario title
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/patch-scenario-title.py'
+      - '.github/workflows/patch-scenario-title.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/patch-scenario-title.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ai-photoshoot-v2/lux-enhancements.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Rename shot plan to shoot scenario"
+          git push
