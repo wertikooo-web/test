@@ -4,6 +4,7 @@
 
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let activeRec=null;
+const TRAVEL_PHOTO='https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Backpacker_in_the_Coxcomb_Mountains_%2829839322165%29.jpg/960px-Backpacker_in_the_Coxcomb_Mountains_%2829839322165%29.jpg';
 
 function langCode(){return (document.documentElement.lang||'ru').toLowerCase().slice(0,2)}
 function startVoice(textarea,button){
@@ -23,10 +24,17 @@ function removeObsoleteCopy(){
 }
 
 function setTravelVisual(){
-  try{const item=styles.find(s=>s.id==='travel');if(item)item.img='assets/styles/travel.svg?v=20260926f'}catch(_e){}
+  try{const item=styles.find(s=>s.id==='travel');if(item)item.img=TRAVEL_PHOTO}catch(_e){}
   document.querySelectorAll('#styleGrid .style').forEach(card=>{
     const name=card.querySelector('strong')?.textContent||'';
-    if(/travel/i.test(name)){const img=card.querySelector('img');if(img)img.src='assets/styles/travel.svg?v=20260926f'}
+    if(/travel/i.test(name)){
+      const img=card.querySelector('img');
+      if(img){
+        img.src=TRAVEL_PHOTO;
+        img.alt='Traveler with backpack in the mountains';
+        img.onerror=()=>{img.onerror=null;img.src='assets/styles/travel.jpg?v=20260926g'};
+      }
+    }
   });
 }
 
@@ -53,7 +61,7 @@ function installEditorVoice(){
 function boot(){
   removeObsoleteCopy();setTravelVisual();installEditorVoice();
   const mainMic=document.getElementById('mainMic'),mainTa=document.getElementById('prompt');if(SR&&mainMic&&mainTa)mainMic.onclick=()=>startVoice(mainTa,mainMic);
-  setTimeout(()=>{removeObsoleteCopy();setTravelVisual();installEditorVoice();try{renderStyles();renderResults()}catch(_e){}},120);
+  setTimeout(()=>{removeObsoleteCopy();setTravelVisual();installEditorVoice();try{renderStyles();setTravelVisual();renderResults()}catch(_e){}},120);
   document.addEventListener('click',e=>{if(e.target.closest('.lang-btn'))setTimeout(()=>{setTravelVisual();installEditorVoice();try{renderResults()}catch(_e){}},60)});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
