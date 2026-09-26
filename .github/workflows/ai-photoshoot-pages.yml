@@ -23,7 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build self-contained Pages artifact
+      - name: Build clean Pages artifact
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -33,6 +33,8 @@ jobs:
           p=root/'index.html'
           s=p.read_text(encoding='utf-8')
 
+          # Remove all old patch layers. The deployed app now has one enhancement layer
+          # and one unified runtime controller.
           for tag in [
               '<link rel="stylesheet" href="lux-enhancements.css">',
               '<link rel="stylesheet" href="busy-indicator.css">',
@@ -42,11 +44,12 @@ jobs:
               '<script src="interaction-fixes.js"></script>',
               '<script src="versioning-controls.js"></script>',
               '<script src="runtime-fixes.js"></script>',
-              '<script src="stability-fixes.js"></script>'
+              '<script src="stability-fixes.js"></script>',
+              '<script src="app-runtime.js"></script>'
           ]:
               s=s.replace(tag,'')
 
-          version='20260926i'
+          version='20260926-clean1'
           s=re.sub(r"(?:/test/)?assets/styles/([a-z-]+\.jpg)(?:\?v=[^'\" ]+)?", rf"assets/styles/\1?v={version}", s)
 
           s=s.replace(
@@ -58,14 +61,14 @@ jobs:
           new="document.getElementById('downloadAll').onclick=async()=>{if(!resultsData.length)return;if(typeof JSZip==='undefined'){resultsData.forEach((r,i)=>setTimeout(()=>downloadData(r.src,`lux-${i+1}.png`),i*180));return}const zip=new JSZip();resultsData.forEach((r,i)=>zip.file(`lux-${i+1}.png`,r.src.split(',')[1],{base64:true}));const blob=await zip.generateAsync({type:'blob'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='ai-photoshoot-lux.zip';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};"
           s=s.replace(old,new)
 
-          travel='https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Backpacker_in_the_Coxcomb_Mountains_%2829839322165%29.jpg/960px-Backpacker_in_the_Coxcomb_Mountains_%2829839322165%29.jpg'
+          travel='https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3e/Brisbane_City_man_%28Unsplash%29.jpg/960px-Brisbane_City_man_%28Unsplash%29.jpg'
           marker='<div class="styles" id="styleGrid"></div>'
           fallback=f'''<div class="styles" id="styleGrid">
             <div class="style selected"><img src="assets/styles/business.jpg?v={version}" alt="Business"><div><strong>Business</strong> <small>Деловой портрет</small></div></div>
             <div class="style"><img src="assets/styles/linkedin.jpg?v={version}" alt="LinkedIn"><div><strong>LinkedIn</strong> <small>Современный headshot</small></div></div>
             <div class="style"><img src="assets/styles/luxury.jpg?v={version}" alt="Luxury"><div><strong>Luxury</strong> <small>Журнальная съёмка</small></div></div>
             <div class="style"><img src="assets/styles/casual.jpg?v={version}" alt="Casual"><div><strong>Casual</strong> <small>Естественный lifestyle</small></div></div>
-            <div class="style"><img src="{travel}" alt="Traveler with backpack in the mountains"><div><strong>Travel</strong> <small>Путешествия</small></div></div>
+            <div class="style"><img src="{travel}" alt="Male traveler with backpack in Brisbane"><div><strong>Travel</strong> <small>Путешествия</small></div></div>
             <div class="style"><img src="assets/styles/editorial.jpg?v={version}" alt="Editorial"><div><strong>Editorial</strong> <small>Журнальный портрет</small></div></div>
             <div class="style"><img src="assets/styles/creative.jpg?v={version}" alt="Creative"><div><strong>Creative</strong> <small>Креативный образ</small></div></div>
             <div class="style"><img src="assets/styles/dating.jpg?v={version}" alt="Dating"><div><strong>Dating</strong> <small>Тёплый естественный кадр</small></div></div>
@@ -73,30 +76,22 @@ jobs:
           if marker in s:
               s=s.replace(marker,fallback,1)
 
-          css='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.css','busy-indicator.css'])
-          js='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.js','planner-toggle-fix.js','ui-repair.js','interaction-fixes.js','versioning-controls.js','runtime-fixes.js','stability-fixes.js'])
+          css=(root/'lux-enhancements.css').read_text(encoding='utf-8')
+          js='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.js','app-runtime.js'])
           s=s.replace('</head>', f'<style id="lux-inline-css">\n{css}\n</style>\n</head>')
           s=s.replace('</body>', f'<script id="lux-inline-js">\n{js}\n</script>\n</body>')
-
           p.write_text(s,encoding='utf-8')
           PY
 
-      - name: Verify Pages artifact
+      - name: Verify clean artifact
         run: |
           test -f ai-photoshoot-v2/index.html
-          for f in business linkedin luxury casual editorial creative dating; do
-            test -s "ai-photoshoot-v2/assets/styles/$f.jpg"
-          done
-          grep -q 'assets/styles/business.jpg?v=20260926i' ai-photoshoot-v2/index.html
-          grep -q 'Backpacker_in_the_Coxcomb_Mountains' ai-photoshoot-v2/index.html
-          grep -q 'Сценарий съёмки' ai-photoshoot-v2/lux-enhancements.js
-          grep -q 'Полуоборот' ai-photoshoot-v2/interaction-fixes.js
-          grep -q 'repeat regeneration' ai-photoshoot-v2/versioning-controls.js
-          grep -q 'voice editing' ai-photoshoot-v2/runtime-fixes.js
-          grep -q 'generation stability' ai-photoshoot-v2/stability-fixes.js
-          grep -q 'luxGenerationProgress' ai-photoshoot-v2/stability-fixes.js
-          grep -q 'Удалить все фото' ai-photoshoot-v2/versioning-controls.js
-          grep -q 'generation stability' ai-photoshoot-v2/index.html
+          grep -q 'AI Photoshoot LUX - unified runtime' ai-photoshoot-v2/index.html
+          grep -q 'Brisbane_City_man' ai-photoshoot-v2/index.html
+          grep -q 'luxRuntimeProgress' ai-photoshoot-v2/index.html
+          grep -q 'Полуоборот' ai-photoshoot-v2/index.html
+          ! grep -q 'generation stability + progress UI' ai-photoshoot-v2/index.html
+          ! grep -q 'repeat regeneration, version history' ai-photoshoot-v2/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
