@@ -37,12 +37,6 @@ function debit(amount,type,shotId,note){
   creditProfile.history.unshift({id:'tx_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),at:now(),amount:-amount,type,shotId:shotId||null,note:note||''});
   saveProfile();return true;
 }
-function refund(amount,type,shotId,note){
-  amount=Number(amount)||0;if(amount<=0)return;
-  creditProfile.balance+=amount;
-  creditProfile.history.unshift({id:'tx_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),at:now(),amount:+amount,type,shotId:shotId||null,note:note||''});
-  saveProfile();
-}
 function actionLabel(type){return type==='edit'?c('edited'):type==='regenerate'?c('regenerated'):type==='restore'?c('restored'):c('generated')}
 
 function injectCss(){
@@ -65,14 +59,11 @@ function ensureResultMeta(r){
      r.__luxVersions.push({src:r.src,type:'generation',credits:cost,at:now(),note:''});
      r.__luxCurrentVersion=r.__luxVersions.length-1;
      r.__luxSpent+=cost;
-     r.__luxInitialRecorded=true;
    }else{
-     // The image already exists, so keep it usable even if the local test balance was exhausted.
-     // Record it as an uncharged test version rather than corrupting the card state.
      r.__luxVersions.push({src:r.src,type:'generation',credits:0,at:now(),note:'test balance exhausted'});
      r.__luxCurrentVersion=r.__luxVersions.length-1;
-     r.__luxInitialRecorded=true;
    }
+   r.__luxInitialRecorded=true;
  }
 }
 function captureEditors(){
@@ -80,9 +71,7 @@ function captureEditors(){
  cards.forEach((card,i)=>{
    const r=resultsData?.[i];if(!r)return;
    const ed=card.querySelector('.editor'),ta=ed?.querySelector('textarea');if(!ta)return;
-   r.__luxDraft=ta.value;
-   r.__luxEditorOpen=!ed.classList.contains('hidden');
-   r.__luxFocus=document.activeElement===ta;
+   r.__luxDraft=ta.value;r.__luxEditorOpen=!ed.classList.contains('hidden');r.__luxFocus=document.activeElement===ta;
    if(r.__luxFocus){r.__luxSelection=[ta.selectionStart||0,ta.selectionEnd||0];r.__luxScroll=ta.scrollTop||0}
  });
 }
@@ -104,8 +93,9 @@ function decorateCards(){
    let meta=card.querySelector('.lux-version-meta');
    if(!meta){meta=document.createElement('div');meta.className='lux-version-meta';const editor=card.querySelector('.editor');if(editor)card.insertBefore(meta,editor);else card.appendChild(meta)}
    const current=(r.__luxCurrentVersion??0)+1,total=r.__luxVersions?.length||1;
-   meta.innerHTML=`<span><strong>${c('version')} v${current}</strong>${total>1?' / '+total:''}</span><span>${c('spent')}: <strong>${r.__luxSpent||0} Credits</strong></span><button type="button" class="lux-history-btn">${c('history')}</button>`;
-   meta.querySelector('.lux-history-btn').onclick=()=>openVersionHistory(i);
+   const nextHtml=`<span><strong>${c('version')} v${current}</strong>${total>1?' / '+total:''}</span><span>${c('spent')}: <strong>${r.__luxSpent||0} Credits</strong></span><button type="button" class="lux-history-btn">${c('history')}</button>`;
+   if(meta.innerHTML!==nextHtml)meta.innerHTML=nextHtml;
+   const historyBtn=meta.querySelector('.lux-history-btn');if(historyBtn)historyBtn.onclick=()=>openVersionHistory(i);
  });
 }
 
@@ -129,31 +119,18 @@ function openCreditHistory(){
 function currentAnchorParts(r){
  const m=String(r.src||'').match(/^data:([^;]+);base64,(.+)$/);return m?{mime:m[1],data:m[2]}:{mime:'image/png',data:String(r.src||'').split(',')[1]||''};
 }
-
 async function repeatRegenerate(idx,editText){
- const r=resultsData?.[idx];if(!r)return;
- ensureResultMeta(r);
- const isEdit=!!String(editText||'').trim();
- const cost=isEdit?COST.edit:COST.regenerate;
+ const r=resultsData?.[idx];if(!r)return;ensureResultMeta(r);
+ const isEdit=!!String(editText||'').trim();const cost=isEdit?COST.edit:COST.regenerate;
  if(creditProfile.balance<cost){alert(c('notEnough'));return}
  const key=document.getElementById('apiKey')?.value.trim();if(!key){document.getElementById('status').textContent=typeof t==='function'?t('needKey'):'Gemini API key required';return}
  const card=document.querySelectorAll('#results .result')[idx];card?.classList.add('busy');
  try{
-   const anchor=currentAnchorParts(r);
-   const identity=await Promise.all(files.slice(0,4).map(async f=>({mime:f.type,data:await toB64(f)})));
-   const refs=[anchor,...identity];
-   const base=buildPrompt(idx);
-   const instruction=isEdit
-     ?`EDIT THE FIRST REFERENCE IMAGE as the current version of this shot. Apply this user request: ${editText}. Preserve this person's identity with very high fidelity, preserve successful details unless the request changes them, and output exactly one standalone photograph.`
-     :`REGENERATE a new variation from the FIRST REFERENCE IMAGE, which is the current version of this shot. Preserve identity, overall intent and successful styling, but create a genuinely new natural variation in pose, expression, framing or small scene details. Output exactly one standalone photograph.`;
+   const anchor=currentAnchorParts(r);const identity=await Promise.all(files.slice(0,4).map(async f=>({mime:f.type,data:await toB64(f)})));const refs=[anchor,...identity];const base=buildPrompt(idx);
+   const instruction=isEdit?`EDIT THE FIRST REFERENCE IMAGE as the current version of this shot. Apply this user request: ${editText}. Preserve this person's identity with very high fidelity, preserve successful details unless the request changes them, and output exactly one standalone photograph.`:`REGENERATE a new variation from the FIRST REFERENCE IMAGE, which is the current version of this shot. Preserve identity, overall intent and successful styling, but create a genuinely new natural variation in pose, expression, framing or small scene details. Output exactly one standalone photograph.`;
    const newSrc=await generateOne(key,`${instruction} ${base}`,refs,[]);
    if(!debit(cost,isEdit?'edit':'regenerate',r.__luxId,isEdit?String(editText).trim():'repeat regeneration')){alert(c('notEnough'));return}
-   r.src=newSrc;
-   r.__luxVersions.push({src:newSrc,type:isEdit?'edit':'regenerate',credits:cost,at:now(),note:isEdit?String(editText).trim():''});
-   r.__luxCurrentVersion=r.__luxVersions.length-1;
-   r.__luxSpent=(r.__luxSpent||0)+cost;
-   r.__luxDraft='';r.__luxEditorOpen=false;r.__luxFocus=false;
-   renderResults();
+   r.src=newSrc;r.__luxVersions.push({src:newSrc,type:isEdit?'edit':'regenerate',credits:cost,at:now(),note:isEdit?String(editText).trim():''});r.__luxCurrentVersion=r.__luxVersions.length-1;r.__luxSpent=(r.__luxSpent||0)+cost;r.__luxDraft='';r.__luxEditorOpen=false;r.__luxFocus=false;renderResults();
  }catch(e){const st=document.getElementById('status');if(st)st.textContent=e?.message||String(e)}finally{document.querySelectorAll('#results .result')[idx]?.classList.remove('busy')}
 }
 
@@ -162,18 +139,11 @@ function resetFilters(){
  try{selected='business'}catch(_e){}
  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val};
  set('styleSelect','business');set('gender','auto');set('background','');set('outfit','');set('ratio','4:5');set('count','4');set('resolution','2K');set('prompt','');
- try{styleRefs.length=0;renderRefs()}catch(_e){}
- try{luxPlan.length=0}catch(_e){}
- try{if(typeof shotTags!=='undefined')shotTags=[]}catch(_e){}
+ try{styleRefs.length=0;renderRefs()}catch(_e){}try{luxPlan.length=0}catch(_e){}try{if(typeof shotTags!=='undefined')shotTags=[]}catch(_e){}
  document.querySelectorAll('.lux-chip').forEach(b=>b.classList.remove('active','is-shot-active'));
- try{renderStyles()}catch(_e){}try{updateCost()}catch(_e){}try{renderPlan(false)}catch(_e){}
- const status=document.getElementById('status');if(status)status.textContent='';
+ try{renderStyles()}catch(_e){}try{updateCost()}catch(_e){}try{renderPlan(false)}catch(_e){}const status=document.getElementById('status');if(status)status.textContent='';
 }
-function deleteAllResults(){
- if(!resultsData?.length)return;
- if(!confirm(c('deleteConfirm')))return;
- resultsData.length=0;renderResults();const wrap=document.getElementById('resultsWrap');if(wrap)wrap.classList.add('hidden');
-}
+function deleteAllResults(){if(!resultsData?.length)return;if(!confirm(c('deleteConfirm')))return;resultsData.length=0;renderResults();const wrap=document.getElementById('resultsWrap');if(wrap)wrap.classList.add('hidden')}
 function ensureBulkControls(){
  const head=document.querySelector('.results-head');if(!head||document.getElementById('luxBulkActions'))return;
  const wrap=document.createElement('div');wrap.className='lux-bulk-actions';wrap.id='luxBulkActions';
@@ -186,8 +156,7 @@ function refreshBulkLabels(){const w=document.getElementById('luxBulkActions');i
 function wrapRender(){
  if(typeof renderResults!=='function'||renderResults.__luxVersionSafe)return;
  const base=renderResults;
- const wrapped=function(){captureEditors();const out=base.apply(this,arguments);decorateCards();ensureBulkControls();restoreEditors();return out};
- wrapped.__luxVersionSafe=true;renderResults=wrapped;
+ const wrapped=function(){captureEditors();const out=base.apply(this,arguments);decorateCards();ensureBulkControls();restoreEditors();return out};wrapped.__luxVersionSafe=true;renderResults=wrapped;
 }
 function overrideRegeneration(){regenerateIndex=repeatRegenerate}
 function guardMainGeneration(){
@@ -199,7 +168,10 @@ function wireBalance(){const box=document.querySelector('.balance');if(box&&box.
 function boot(){
  injectCss();updateBalanceUI();wrapRender();overrideRegeneration();guardMainGeneration();wireBalance();ensureBulkControls();decorateCards();
  document.addEventListener('click',e=>{if(e.target.closest('.lang-btn'))setTimeout(()=>{refreshBulkLabels();decorateCards();updateBalanceUI()},40)});
- const root=document.getElementById('resultsWrap')||document.body;new MutationObserver(()=>{ensureBulkControls();decorateCards()}).observe(root,{childList:true,subtree:true});
+ /* No MutationObserver here. The old subtree observer called decorateCards(),
+    which rewrote meta.innerHTML, triggered the same observer again and created
+    an endless DOM mutation loop that froze the page. renderResults is already
+    wrapped above, so all card decoration is updated at the correct lifecycle point. */
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
