@@ -29,9 +29,12 @@ jobs:
           p=Path('ai-photoshoot-v2/index.html')
           s=p.read_text(encoding='utf-8')
           css='<link rel="stylesheet" href="lux-enhancements.css">'
+          busy_css='<link rel="stylesheet" href="busy-indicator.css">'
           js='<script src="lux-enhancements.js"></script>'
           if css not in s:
               s=s.replace('</head>', css+'\n</head>')
+          if busy_css not in s:
+              s=s.replace('</head>', busy_css+'\n</head>')
           if js not in s:
               s=s.replace('</body>', js+'\n</body>')
           p.write_text(s,encoding='utf-8')
