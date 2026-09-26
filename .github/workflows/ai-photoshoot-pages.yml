@@ -38,11 +38,12 @@ jobs:
               '<link rel="stylesheet" href="busy-indicator.css">',
               '<script src="lux-enhancements.js"></script>',
               '<script src="planner-toggle-fix.js"></script>',
-              '<script src="ui-repair.js"></script>'
+              '<script src="ui-repair.js"></script>',
+              '<script src="interaction-fixes.js"></script>'
           ]:
               s=s.replace(tag,'')
 
-          version='20260926d'
+          version='20260926e'
           s=re.sub(r"(?:/test/)?assets/styles/([a-z-]+\.jpg)(?:\?v=[^'\" ]+)?", rf"assets/styles/\1?v={version}", s)
 
           s=s.replace(
@@ -56,20 +57,20 @@ jobs:
 
           marker='<div class="styles" id="styleGrid"></div>'
           fallback='''<div class="styles" id="styleGrid">
-            <div class="style selected"><img src="assets/styles/business.jpg?v=20260926d" alt="Business"><div><strong>Business</strong> <small>Деловой портрет</small></div></div>
-            <div class="style"><img src="assets/styles/linkedin.jpg?v=20260926d" alt="LinkedIn"><div><strong>LinkedIn</strong> <small>Современный headshot</small></div></div>
-            <div class="style"><img src="assets/styles/luxury.jpg?v=20260926d" alt="Luxury"><div><strong>Luxury</strong> <small>Журнальная съёмка</small></div></div>
-            <div class="style"><img src="assets/styles/casual.jpg?v=20260926d" alt="Casual"><div><strong>Casual</strong> <small>Естественный lifestyle</small></div></div>
-            <div class="style"><img src="assets/styles/travel.jpg?v=20260926d" alt="Travel"><div><strong>Travel</strong> <small>Путешествия</small></div></div>
-            <div class="style"><img src="assets/styles/editorial.jpg?v=20260926d" alt="Editorial"><div><strong>Editorial</strong> <small>Журнальный портрет</small></div></div>
-            <div class="style"><img src="assets/styles/creative.jpg?v=20260926d" alt="Creative"><div><strong>Creative</strong> <small>Креативный образ</small></div></div>
-            <div class="style"><img src="assets/styles/dating.jpg?v=20260926d" alt="Dating"><div><strong>Dating</strong> <small>Тёплый естественный кадр</small></div></div>
+            <div class="style selected"><img src="assets/styles/business.jpg?v=20260926e" alt="Business"><div><strong>Business</strong> <small>Деловой портрет</small></div></div>
+            <div class="style"><img src="assets/styles/linkedin.jpg?v=20260926e" alt="LinkedIn"><div><strong>LinkedIn</strong> <small>Современный headshot</small></div></div>
+            <div class="style"><img src="assets/styles/luxury.jpg?v=20260926e" alt="Luxury"><div><strong>Luxury</strong> <small>Журнальная съёмка</small></div></div>
+            <div class="style"><img src="assets/styles/casual.jpg?v=20260926e" alt="Casual"><div><strong>Casual</strong> <small>Естественный lifestyle</small></div></div>
+            <div class="style"><img src="assets/styles/travel.jpg?v=20260926e" alt="Travel"><div><strong>Travel</strong> <small>Путешествия</small></div></div>
+            <div class="style"><img src="assets/styles/editorial.jpg?v=20260926e" alt="Editorial"><div><strong>Editorial</strong> <small>Журнальный портрет</small></div></div>
+            <div class="style"><img src="assets/styles/creative.jpg?v=20260926e" alt="Creative"><div><strong>Creative</strong> <small>Креативный образ</small></div></div>
+            <div class="style"><img src="assets/styles/dating.jpg?v=20260926e" alt="Dating"><div><strong>Dating</strong> <small>Тёплый естественный кадр</small></div></div>
           </div>'''
           if marker in s:
               s=s.replace(marker,fallback,1)
 
           css='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.css','busy-indicator.css'])
-          js='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.js','planner-toggle-fix.js','ui-repair.js'])
+          js='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.js','planner-toggle-fix.js','ui-repair.js','interaction-fixes.js'])
           s=s.replace('</head>', f'<style id="lux-inline-css">\n{css}\n</style>\n</head>')
           s=s.replace('</body>', f'<script id="lux-inline-js">\n{js}\n</script>\n</body>')
 
@@ -82,8 +83,10 @@ jobs:
           for f in business linkedin luxury casual travel editorial creative dating; do
             test -s "ai-photoshoot-v2/assets/styles/$f.jpg"
           done
-          grep -q 'assets/styles/business.jpg?v=20260926d' ai-photoshoot-v2/index.html
+          grep -q 'assets/styles/business.jpg?v=20260926e' ai-photoshoot-v2/index.html
           grep -q 'Сценарий съёмки' ai-photoshoot-v2/lux-enhancements.js
+          grep -q 'active-shot planner' ai-photoshoot-v2/interaction-fixes.js
+          grep -q 'editor-state preservation' ai-photoshoot-v2/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -98,5 +101,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-# manual redeploy marker: 2026-09-26Tmanual2
