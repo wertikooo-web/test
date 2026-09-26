@@ -36,6 +36,7 @@ const GROUPS=[
 ];
 let activeShot=0;
 let shotTags=[];
+let lastRowCount=-1;
 
 function lc(){return (document.documentElement.lang||'ru').toLowerCase().slice(0,2)}
 function tx(k){const l=lc();return (TXT[l]||TXT.ru)[k]||k}
@@ -59,8 +60,6 @@ function ensurePlannerStructure(){
  const quick=box?.querySelector('.lux-quick');
  const plan=document.getElementById('luxPlan');
  if(!box||!quick||!plan)return;
-
- // Preserve previous selections before rebuilding quick controls.
  if(!quick.dataset.activeShotUi){
    quick.dataset.activeShotUi='1';
    quick.innerHTML='';
@@ -114,7 +113,7 @@ function applyTagsToShot(i){
 function removeTag(i,key){if(shotTags[i])shotTags[i].delete(key);const row=document.querySelectorAll('#luxPlan .lux-shot-row')[i];if(row){const input=row.querySelector('input');if(input){const keys=[...shotTags[i]];input.value=keys.length?keys.map(k=>CLAUSE[k]).join(', '):'';input.dispatchEvent(new Event('input',{bubbles:true}))}}wireRows()}
 function renderTagsForRow(row,i){
  let tags=row.querySelector('.lux-shot-tags');if(!tags){tags=document.createElement('div');tags.className='lux-shot-tags';row.appendChild(tags)}
- tags.innerHTML='';[...(shotTags[i]||[])].forEach(key=>{const chip=document.createElement('span');chip.className='lux-shot-tag';chip.innerHTML=`${label(key)} <button type="button" aria-label="remove">×</button>`;chip.querySelector('button').addEventListener('click',e=>{e.stopPropagation();removeTag(i,key)});tags.appendChild(chip)})
+ tags.replaceChildren();[...(shotTags[i]||[])].forEach(key=>{const chip=document.createElement('span');chip.className='lux-shot-tag';chip.append(document.createTextNode(label(key)+' '));const x=document.createElement('button');x.type='button';x.setAttribute('aria-label','remove');x.textContent='×';x.addEventListener('click',e=>{e.stopPropagation();removeTag(i,key)});chip.appendChild(x);tags.appendChild(chip)})
 }
 function updateQuickActive(){document.querySelectorAll('.lux-chip[data-quick]').forEach(b=>b.classList.toggle('is-shot-active',!!shotTags[activeShot]?.has(b.dataset.quick)))}
 function refreshPlannerLabels(){
@@ -128,9 +127,14 @@ function refreshPlannerLabels(){
 
 function installPlanner(){
  injectStyles();ensurePlannerStructure();
- const plan=document.getElementById('luxPlan');if(plan&&!plan.dataset.activeObserver){plan.dataset.activeObserver='1';new MutationObserver(()=>queueMicrotask(ensurePlannerStructure)).observe(plan,{childList:true})}
+ const plan=document.getElementById('luxPlan');if(plan&&!plan.dataset.activeObserver){
+   plan.dataset.activeObserver='1';lastRowCount=plan.querySelectorAll(':scope > .lux-shot-row').length;
+   new MutationObserver(()=>{const count=plan.querySelectorAll(':scope > .lux-shot-row').length;if(count!==lastRowCount){lastRowCount=count;queueMicrotask(wireRows)}}).observe(plan,{childList:true});
+ }
  const box=document.getElementById('luxSeriesBox');if(box&&!box.dataset.langObserver){box.dataset.langObserver='1';document.addEventListener('click',e=>{if(e.target.closest('.lang-btn'))setTimeout(refreshPlannerLabels,30)})}
 }
+
+function getResult(i){try{return (typeof resultsData!=='undefined'&&resultsData)?resultsData[i]:null}catch{return null}}
 
 // Preserve open editor, draft text, caret and focus when any other result is generated/re-rendered.
 function installRenderStateProtection(){
@@ -139,7 +143,7 @@ function installRenderStateProtection(){
  function capture(){
    const cards=[...document.querySelectorAll('#results .result')];
    cards.forEach((card,i)=>{
-     const r=window.resultsData?.[i];if(!r)return;
+     const r=getResult(i);if(!r)return;
      const ed=card.querySelector('.editor'),ta=ed?.querySelector('textarea');
      if(!ta)return;
      r.__luxDraft=ta.value;
@@ -150,7 +154,7 @@ function installRenderStateProtection(){
  function restore(){
    const cards=[...document.querySelectorAll('#results .result')];
    cards.forEach((card,i)=>{
-     const r=window.resultsData?.[i];if(!r)return;
+     const r=getResult(i);if(!r)return;
      const ed=card.querySelector('.editor'),ta=ed?.querySelector('textarea');if(!ta)return;
      if(typeof r.__luxDraft==='string')ta.value=r.__luxDraft;
      if(r.__luxEditorOpen)ed.classList.remove('hidden');
@@ -163,8 +167,8 @@ function installRenderStateProtection(){
 // Dialog closes visually as soon as Create is pressed; also provide an explicit X.
 function installDialogUX(){
  document.addEventListener('click',e=>{
-   const go=e.target.closest('.lux-dialog .go');if(go){const dlg=go.closest('.lux-dialog');if(dlg){dlg.classList.add('is-submitted');setTimeout(()=>{if(dlg.isConnected&&dlg.classList.contains('is-submitted'))dlg.style.display='none'},0)}}
-   const x=e.target.closest('.lux-dialog-x');if(x){x.closest('.lux-dialog')?.remove()}
+   const go=e.target.closest('.lux-dialog .go');if(go){const dlg=go.closest('.lux-dialog');if(dlg)dlg.classList.add('is-submitted')}
+   const x=e.target.closest('.lux-dialog-x');if(x)x.closest('.lux-dialog')?.remove();
  },true);
  const obs=new MutationObserver(muts=>{for(const m of muts)for(const n of m.addedNodes){if(!(n instanceof HTMLElement))continue;const dialogs=n.matches?.('.lux-dialog')?[n]:[...n.querySelectorAll?.('.lux-dialog')||[]];dialogs.forEach(d=>{const card=d.querySelector('.lux-dialog-card');if(card&&!card.querySelector('.lux-dialog-x')){const x=document.createElement('button');x.type='button';x.className='lux-dialog-x';x.textContent='×';x.title=tx('close');card.prepend(x)}})}});obs.observe(document.body,{childList:true,subtree:true});
 }
