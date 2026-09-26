@@ -1,0 +1,21 @@
+name: Patch regeneration spinner
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/add_busy_indicator.py'
+      - '.github/workflows/patch-busy-indicator.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/scripts/add_busy_indicator.py
+      - run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ai-photoshoot-v2/index.html
+          git diff --cached --quiet || git commit -m "Show spinner while regenerating photos"
+          git push
