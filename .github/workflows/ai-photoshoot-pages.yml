@@ -22,27 +22,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Inject LUX enhancements
+      - name: Build self-contained Pages artifact
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('ai-photoshoot-v2/index.html')
+          import re
+
+          root=Path('ai-photoshoot-v2')
+          p=root/'index.html'
           s=p.read_text(encoding='utf-8')
-          css='<link rel="stylesheet" href="lux-enhancements.css">'
-          busy_css='<link rel="stylesheet" href="busy-indicator.css">'
-          js='<script src="lux-enhancements.js"></script>'
-          toggle_js='<script src="planner-toggle-fix.js"></script>'
-          repair_js='<script src="ui-repair.js"></script>'
-          if css not in s:
-              s=s.replace('</head>', css+'\n</head>')
-          if busy_css not in s:
-              s=s.replace('</head>', busy_css+'\n</head>')
-          if js not in s:
-              s=s.replace('</body>', js+'\n</body>')
-          if toggle_js not in s:
-              s=s.replace('</body>', toggle_js+'\n</body>')
-          if repair_js not in s:
-              s=s.replace('</body>', repair_js+'\n</body>')
+
+          # Remove previously injected external enhancement assets.
+          for tag in [
+              '<link rel="stylesheet" href="lux-enhancements.css">',
+              '<link rel="stylesheet" href="busy-indicator.css">',
+              '<script src="lux-enhancements.js"></script>',
+              '<script src="planner-toggle-fix.js"></script>',
+              '<script src="ui-repair.js"></script>'
+          ]:
+              s=s.replace(tag,'')
+
+          # Use absolute project paths and cache-bust style images.
+          version='20260926b'
+          s=re.sub(r"assets/styles/([a-z-]+\.jpg)(?:\?v=[^'\" ]+)?", rf"/test/assets/styles/\1?v={version}", s)
+
+          # Inline enhancement CSS/JS so the browser cannot serve stale helper files.
+          css='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.css','busy-indicator.css'])
+          js='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.js','planner-toggle-fix.js','ui-repair.js'])
+          s=s.replace('</head>', f'<style id="lux-inline-css">\n{css}\n</style>\n</head>')
+          s=s.replace('</body>', f'<script id="lux-inline-js">\n{js}\n</script>\n</body>')
           p.write_text(s,encoding='utf-8')
           PY
       - name: Setup Pages
