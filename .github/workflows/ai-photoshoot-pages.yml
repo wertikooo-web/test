@@ -5,7 +5,7 @@ on:
     paths:
       - 'ai-photoshoot-v2/**'
       - '.github/workflows/ai-photoshoot-pages.yml'
-    workflow_dispatch:
+  workflow_dispatch:
 permissions:
   contents: read
   pages: write
@@ -41,11 +41,12 @@ jobs:
               '<script src="ui-repair.js"></script>',
               '<script src="interaction-fixes.js"></script>',
               '<script src="versioning-controls.js"></script>',
-              '<script src="runtime-fixes.js"></script>'
+              '<script src="runtime-fixes.js"></script>',
+              '<script src="stability-fixes.js"></script>'
           ]:
               s=s.replace(tag,'')
 
-          version='20260926h'
+          version='20260926i'
           s=re.sub(r"(?:/test/)?assets/styles/([a-z-]+\.jpg)(?:\?v=[^'\" ]+)?", rf"assets/styles/\1?v={version}", s)
 
           s=s.replace(
@@ -73,7 +74,7 @@ jobs:
               s=s.replace(marker,fallback,1)
 
           css='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.css','busy-indicator.css'])
-          js='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.js','planner-toggle-fix.js','ui-repair.js','interaction-fixes.js','versioning-controls.js','runtime-fixes.js'])
+          js='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.js','planner-toggle-fix.js','ui-repair.js','interaction-fixes.js','versioning-controls.js','runtime-fixes.js','stability-fixes.js'])
           s=s.replace('</head>', f'<style id="lux-inline-css">\n{css}\n</style>\n</head>')
           s=s.replace('</body>', f'<script id="lux-inline-js">\n{js}\n</script>\n</body>')
 
@@ -86,15 +87,16 @@ jobs:
           for f in business linkedin luxury casual editorial creative dating; do
             test -s "ai-photoshoot-v2/assets/styles/$f.jpg"
           done
-          grep -q 'assets/styles/business.jpg?v=20260926h' ai-photoshoot-v2/index.html
+          grep -q 'assets/styles/business.jpg?v=20260926i' ai-photoshoot-v2/index.html
           grep -q 'Backpacker_in_the_Coxcomb_Mountains' ai-photoshoot-v2/index.html
           grep -q 'Сценарий съёмки' ai-photoshoot-v2/lux-enhancements.js
           grep -q 'Полуоборот' ai-photoshoot-v2/interaction-fixes.js
           grep -q 'repeat regeneration' ai-photoshoot-v2/versioning-controls.js
           grep -q 'voice editing' ai-photoshoot-v2/runtime-fixes.js
+          grep -q 'generation stability' ai-photoshoot-v2/stability-fixes.js
+          grep -q 'luxGenerationProgress' ai-photoshoot-v2/stability-fixes.js
           grep -q 'Удалить все фото' ai-photoshoot-v2/versioning-controls.js
-          grep -q 'credit ledger' ai-photoshoot-v2/index.html
-          grep -q 'Runtime fixes' ai-photoshoot-v2/index.html
+          grep -q 'generation stability' ai-photoshoot-v2/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
