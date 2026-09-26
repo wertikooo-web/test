@@ -22,6 +22,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Build self-contained Pages artifact
         run: |
           python3 - <<'PY'
@@ -32,7 +33,7 @@ jobs:
           p=root/'index.html'
           s=p.read_text(encoding='utf-8')
 
-          # Remove previously injected external enhancement assets.
+          # Remove old injected helper tags before building a fresh artifact.
           for tag in [
               '<link rel="stylesheet" href="lux-enhancements.css">',
               '<link rel="stylesheet" href="busy-indicator.css">',
@@ -42,25 +43,64 @@ jobs:
           ]:
               s=s.replace(tag,'')
 
-          # Use absolute project paths and cache-bust style images.
-          version='20260926b'
-          s=re.sub(r"assets/styles/([a-z-]+\.jpg)(?:\?v=[^'\" ]+)?", rf"/test/assets/styles/\1?v={version}", s)
+          # Keep style images local to the deployed site. Relative paths are robust on GitHub Pages.
+          version='20260926c'
+          s=re.sub(r"(?:/test/)?assets/styles/([a-z-]+\.jpg)(?:\?v=[^'\" ]+)?", rf"assets/styles/\1?v={version}", s)
 
-          # Inline enhancement CSS/JS so the browser cannot serve stale helper files.
+          # JSZip must never block the app startup. If its CDN is unavailable, the core UI still runs.
+          s=s.replace(
+              '<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>',
+              '<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>'
+          )
+
+          # Make Download All degrade gracefully if JSZip is blocked/unavailable.
+          old="document.getElementById('downloadAll').onclick=async()=>{if(!resultsData.length)return;const zip=new JSZip();resultsData.forEach((r,i)=>zip.file(`lux-${i+1}.png`,r.src.split(',')[1],{base64:true}));const blob=await zip.generateAsync({type:'blob'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='ai-photoshoot-lux.zip';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};"
+          new="document.getElementById('downloadAll').onclick=async()=>{if(!resultsData.length)return;if(typeof JSZip==='undefined'){resultsData.forEach((r,i)=>setTimeout(()=>downloadData(r.src,`lux-${i+1}.png`),i*180));return}const zip=new JSZip();resultsData.forEach((r,i)=>zip.file(`lux-${i+1}.png`,r.src.split(',')[1],{base64:true}));const blob=await zip.generateAsync({type:'blob'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='ai-photoshoot-lux.zip';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};"
+          s=s.replace(old,new)
+
+          # Add static style cards as a no-JS visual fallback. JS will replace these normally.
+          marker='<div class="styles" id="styleGrid"></div>'
+          fallback='''<div class="styles" id="styleGrid">
+            <div class="style selected"><img src="assets/styles/business.jpg?v=20260926c" alt="Business"><div><strong>Business</strong> <small>Деловой портрет</small></div></div>
+            <div class="style"><img src="assets/styles/linkedin.jpg?v=20260926c" alt="LinkedIn"><div><strong>LinkedIn</strong> <small>Современный headshot</small></div></div>
+            <div class="style"><img src="assets/styles/luxury.jpg?v=20260926c" alt="Luxury"><div><strong>Luxury</strong> <small>Журнальная съёмка</small></div></div>
+            <div class="style"><img src="assets/styles/casual.jpg?v=20260926c" alt="Casual"><div><strong>Casual</strong> <small>Естественный lifestyle</small></div></div>
+            <div class="style"><img src="assets/styles/travel.jpg?v=20260926c" alt="Travel"><div><strong>Travel</strong> <small>Путешествия</small></div></div>
+            <div class="style"><img src="assets/styles/editorial.jpg?v=20260926c" alt="Editorial"><div><strong>Editorial</strong> <small>Журнальный портрет</small></div></div>
+            <div class="style"><img src="assets/styles/creative.jpg?v=20260926c" alt="Creative"><div><strong>Creative</strong> <small>Креативный образ</small></div></div>
+            <div class="style"><img src="assets/styles/dating.jpg?v=20260926c" alt="Dating"><div><strong>Dating</strong> <small>Тёплый естественный кадр</small></div></div>
+          </div>'''
+          if marker in s:
+              s=s.replace(marker,fallback,1)
+
+          # Inline our own helper CSS/JS so these changes do not depend on browser cache.
           css='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.css','busy-indicator.css'])
           js='\n'.join((root/f).read_text(encoding='utf-8') for f in ['lux-enhancements.js','planner-toggle-fix.js','ui-repair.js'])
           s=s.replace('</head>', f'<style id="lux-inline-css">\n{css}\n</style>\n</head>')
           s=s.replace('</body>', f'<script id="lux-inline-js">\n{js}\n</script>\n</body>')
+
           p.write_text(s,encoding='utf-8')
           PY
+
+      - name: Verify Pages artifact
+        run: |
+          test -f ai-photoshoot-v2/index.html
+          for f in business linkedin luxury casual travel editorial creative dating; do
+            test -s "ai-photoshoot-v2/assets/styles/$f.jpg"
+          done
+          grep -q 'assets/styles/business.jpg?v=20260926c' ai-photoshoot-v2/index.html
+          grep -q 'Сценарий съёмки' ai-photoshoot-v2/lux-enhancements.js
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
           enablement: true
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ai-photoshoot-v2
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
