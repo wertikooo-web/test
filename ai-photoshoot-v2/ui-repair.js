@@ -1,4 +1,4 @@
-/* UI repair layer: reliable style visuals + clean planner toggle */
+/* UI repair layer: reliable style visuals + clean planner toggle | deploy sync 2026-09-26 */
 (function(){
   'use strict';
 
