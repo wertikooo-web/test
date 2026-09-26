@@ -8,14 +8,18 @@ const TXT={
   ro:{adding:'Adăugăm în',next:'Cadrul următor',pose:'Poziție',framing:'Încadrare',place:'Loc',close:'Închide'}
 };
 const LABELS={
-  ru:{standing:'Стою',sitting:'Сижу',walking:'Иду',full:'Полный рост',waist:'По пояс',blur:'Размытый фон',viewpoint:'Смотровая',mountains:'Горы',beach:'Пляж',city:'Город',market:'Рынок',cafe:'Кафе',park:'Парк',oldtown:'Старый город',forest:'Лес'},
-  en:{standing:'Standing',sitting:'Sitting',walking:'Walking',full:'Full body',waist:'Waist-up',blur:'Blurred background',viewpoint:'Viewpoint',mountains:'Mountains',beach:'Beach',city:'City',market:'Market',cafe:'Cafe',park:'Park',oldtown:'Old town',forest:'Forest'},
-  ro:{standing:'În picioare',sitting:'Așezat',walking:'Mergând',full:'Cadru întreg',waist:'Până la talie',blur:'Fundal blurat',viewpoint:'Belvedere',mountains:'Munți',beach:'Plajă',city:'Oraș',market:'Piață',cafe:'Cafenea',park:'Parc',oldtown:'Oraș vechi',forest:'Pădure'}
+  ru:{standing:'Стою',sitting:'Сижу',walking:'Иду',lying:'Лежу',leaning:'Опираюсь',turning:'Полуоборот',lookingback:'Оглядываюсь',full:'Полный рост',waist:'По пояс',blur:'Размытый фон',viewpoint:'Смотровая',mountains:'Горы',beach:'Пляж',city:'Город',market:'Рынок',cafe:'Кафе',park:'Парк',oldtown:'Старый город',forest:'Лес'},
+  en:{standing:'Standing',sitting:'Sitting',walking:'Walking',lying:'Reclining',leaning:'Leaning',turning:'Three-quarter',lookingback:'Looking back',full:'Full body',waist:'Waist-up',blur:'Blurred background',viewpoint:'Viewpoint',mountains:'Mountains',beach:'Beach',city:'City',market:'Market',cafe:'Cafe',park:'Park',oldtown:'Old town',forest:'Forest'},
+  ro:{standing:'În picioare',sitting:'Așezat',walking:'Mergând',lying:'Culcat',leaning:'Sprijinit',turning:'Trei sferturi',lookingback:'Privind înapoi',full:'Cadru întreg',waist:'Până la talie',blur:'Fundal blurat',viewpoint:'Belvedere',mountains:'Munți',beach:'Plajă',city:'Oraș',market:'Piață',cafe:'Cafenea',park:'Parc',oldtown:'Oraș vechi',forest:'Pădure'}
 };
 const CLAUSE={
  standing:'standing naturally',
  sitting:'seated naturally in a relaxed pose',
  walking:'walking naturally, candid mid-step',
+ lying:'reclining naturally in a relaxed pose',
+ leaning:'leaning naturally on a wall or railing',
+ turning:'three-quarter pose, body slightly turned',
+ lookingback:'looking back over the shoulder',
  full:'full-body portrait, entire person visible',
  waist:'waist-up portrait',
  blur:'softly blurred background with shallow depth of field',
@@ -29,8 +33,9 @@ const CLAUSE={
  oldtown:'in an old-town street with architectural character',
  forest:'in a natural forest setting'
 };
+const POSE_KEYS=['standing','sitting','walking','lying','leaning','turning','lookingback'];
 const GROUPS=[
-  ['pose',['standing','sitting','walking']],
+  ['pose',POSE_KEYS],
   ['framing',['full','waist','blur']],
   ['place',['viewpoint','mountains','beach','city','market','cafe','park','oldtown','forest']]
 ];
@@ -99,14 +104,19 @@ function wireRows(){
 function setActiveShot(i){activeShot=Math.max(0,i);wireRows()}
 function toggleTag(i,key){
  if(!shotTags[i])shotTags[i]=new Set();
- if(shotTags[i].has(key))shotTags[i].delete(key);else shotTags[i].add(key);
+ if(POSE_KEYS.includes(key)){
+   const wasSelected=shotTags[i].has(key);
+   POSE_KEYS.forEach(k=>shotTags[i].delete(k));
+   if(!wasSelected)shotTags[i].add(key);
+ }else{
+   if(shotTags[i].has(key))shotTags[i].delete(key);else shotTags[i].add(key);
+ }
  applyTagsToShot(i);wireRows();
 }
 function applyTagsToShot(i){
  const row=document.querySelectorAll('#luxPlan .lux-shot-row')[i];if(!row)return;
  const input=row.querySelector('input');if(!input)return;
  const keys=[...(shotTags[i]||[])];
- if(!keys.length)return;
  input.value=keys.map(k=>CLAUSE[k]).join(', ');
  input.dispatchEvent(new Event('input',{bubbles:true}));
 }
@@ -135,41 +145,16 @@ function installPlanner(){
 }
 
 function getResult(i){try{return (typeof resultsData!=='undefined'&&resultsData)?resultsData[i]:null}catch{return null}}
-
-// Preserve open editor, draft text, caret and focus when any other result is generated/re-rendered.
 function installRenderStateProtection(){
  if(typeof window.renderResults!=='function' || window.renderResults.__luxStateSafe)return;
  const base=window.renderResults;
- function capture(){
-   const cards=[...document.querySelectorAll('#results .result')];
-   cards.forEach((card,i)=>{
-     const r=getResult(i);if(!r)return;
-     const ed=card.querySelector('.editor'),ta=ed?.querySelector('textarea');
-     if(!ta)return;
-     r.__luxDraft=ta.value;
-     r.__luxEditorOpen=!ed.classList.contains('hidden');
-     if(document.activeElement===ta){r.__luxFocus=true;r.__luxSel=[ta.selectionStart||0,ta.selectionEnd||0];r.__luxScroll=ta.scrollTop||0}else r.__luxFocus=false;
-   });
- }
- function restore(){
-   const cards=[...document.querySelectorAll('#results .result')];
-   cards.forEach((card,i)=>{
-     const r=getResult(i);if(!r)return;
-     const ed=card.querySelector('.editor'),ta=ed?.querySelector('textarea');if(!ta)return;
-     if(typeof r.__luxDraft==='string')ta.value=r.__luxDraft;
-     if(r.__luxEditorOpen)ed.classList.remove('hidden');
-     if(r.__luxFocus){requestAnimationFrame(()=>{ta.focus();const s=r.__luxSel||[ta.value.length,ta.value.length];try{ta.setSelectionRange(s[0],s[1])}catch{}ta.scrollTop=r.__luxScroll||0})}
-   });
- }
+ function capture(){const cards=[...document.querySelectorAll('#results .result')];cards.forEach((card,i)=>{const r=getResult(i);if(!r)return;const ed=card.querySelector('.editor'),ta=ed?.querySelector('textarea');if(!ta)return;r.__luxDraft=ta.value;r.__luxEditorOpen=!ed.classList.contains('hidden');if(document.activeElement===ta){r.__luxFocus=true;r.__luxSel=[ta.selectionStart||0,ta.selectionEnd||0];r.__luxScroll=ta.scrollTop||0}else r.__luxFocus=false})}
+ function restore(){const cards=[...document.querySelectorAll('#results .result')];cards.forEach((card,i)=>{const r=getResult(i);if(!r)return;const ed=card.querySelector('.editor'),ta=ed?.querySelector('textarea');if(!ta)return;if(typeof r.__luxDraft==='string')ta.value=r.__luxDraft;if(r.__luxEditorOpen)ed.classList.remove('hidden');if(r.__luxFocus){requestAnimationFrame(()=>{ta.focus();const s=r.__luxSel||[ta.value.length,ta.value.length];try{ta.setSelectionRange(s[0],s[1])}catch{}ta.scrollTop=r.__luxScroll||0})}})}
  const wrapped=function(){capture();const out=base.apply(this,arguments);restore();return out};wrapped.__luxStateSafe=true;window.renderResults=wrapped;
 }
 
-// Dialog closes visually as soon as Create is pressed; also provide an explicit X.
 function installDialogUX(){
- document.addEventListener('click',e=>{
-   const go=e.target.closest('.lux-dialog .go');if(go){const dlg=go.closest('.lux-dialog');if(dlg)dlg.classList.add('is-submitted')}
-   const x=e.target.closest('.lux-dialog-x');if(x)x.closest('.lux-dialog')?.remove();
- },true);
+ document.addEventListener('click',e=>{const go=e.target.closest('.lux-dialog .go');if(go){const dlg=go.closest('.lux-dialog');if(dlg)dlg.classList.add('is-submitted')}const x=e.target.closest('.lux-dialog-x');if(x)x.closest('.lux-dialog')?.remove()},true);
  const obs=new MutationObserver(muts=>{for(const m of muts)for(const n of m.addedNodes){if(!(n instanceof HTMLElement))continue;const dialogs=n.matches?.('.lux-dialog')?[n]:[...n.querySelectorAll?.('.lux-dialog')||[]];dialogs.forEach(d=>{const card=d.querySelector('.lux-dialog-card');if(card&&!card.querySelector('.lux-dialog-x')){const x=document.createElement('button');x.type='button';x.className='lux-dialog-x';x.textContent='×';x.title=tx('close');card.prepend(x)}})}});obs.observe(document.body,{childList:true,subtree:true});
 }
 
