@@ -8,7 +8,6 @@ function wirePlanner(){
   if(!box||!toggle||box.dataset.toggleWired==='1')return;
   box.dataset.toggleWired='1';
 
-  // Remove obsolete explanatory/help controls if an older build still injects them.
   box.querySelector('#luxAutoPlan')?.remove();
   box.querySelector('#luxPlanHelp')?.remove();
 
@@ -24,10 +23,8 @@ function wirePlanner(){
     if(plan) plan.style.display=enabled?'':'none';
     if(status) status.style.display=enabled?'':'none';
 
-    // When disabled, keep the general prompt as the only source of guidance.
-    // When re-enabled, ask the existing planner to rebuild its per-shot fields.
     if(enabled && typeof renderPlan==='function'){
-      try{ renderPlan(false); }catch(_e){}
+      try{renderPlan(false);}catch(_e){}
     }
   };
 
@@ -47,15 +44,6 @@ function ensureMissingQuickIdeas(){
     ro:{beach:'Plajă',city:'Oraș',market:'Piață',cafe:'Cafenea',park:'Parc',oldtown:'Oraș vechi',forest:'Pădure'}
   };
   const text=labels[lang]||labels.ru;
-  const prompts={
-    beach:'on a beach with a natural coastal background',
-    city:'in a lively city environment',
-    market:'at a local market with a natural candid atmosphere',
-    cafe:'at an outdoor or stylish cafe setting',
-    park:'in a green city park',
-    oldtown:'in an old-town street with architectural character',
-    forest:'in a natural forest setting'
-  };
 
   Object.entries(text).forEach(([key,label])=>{
     if(quick.querySelector('[data-quick="'+key+'"]'))return;
@@ -69,13 +57,6 @@ function ensureMissingQuickIdeas(){
       b.classList.toggle('active');
       if(typeof renderPlan==='function'){
         try{renderPlan(false);}catch(_e){}
-      } else {
-        const root=document.getElementById('luxPlan');
-        if(root && b.classList.contains('active')){
-          const inputs=[...root.querySelectorAll('input')];
-          const empty=inputs.find(i=>!i.value.trim());
-          if(empty)empty.value=prompts[key];
-        }
       }
     });
     quick.appendChild(b);
@@ -86,7 +67,8 @@ function normalizeScenarioTitle(){
   const title=document.getElementById('luxPlanTitle');
   if(!title)return;
   const lang=(document.documentElement.lang||'ru').toLowerCase().slice(0,2);
-  title.textContent=lang==='en'?'Shoot scenario':lang==='ro'?'Scenariul ședinței':'Сценарий съёмки';
+  const next=lang==='en'?'Shoot scenario':lang==='ro'?'Scenariul ședinței':'Сценарий съёмки';
+  if(title.textContent!==next)title.textContent=next;
 }
 
 function apply(){
@@ -95,9 +77,12 @@ function apply(){
   normalizeScenarioTitle();
 }
 
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});
 else apply();
 
-const observer=new MutationObserver(()=>apply());
-observer.observe(document.documentElement,{childList:true,subtree:true});
+/* Deliberately no global MutationObserver here. The old observer rewrote
+   the title on every DOM mutation and could create an endless mutation loop,
+   freezing the whole page. */
+setTimeout(apply,50);
+setTimeout(apply,500);
 })();
