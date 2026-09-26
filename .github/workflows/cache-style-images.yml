@@ -1,0 +1,53 @@
+name: Cache AI Photoshoot style images
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cache-style-images.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download style images into repository
+        run: |
+          set -euo pipefail
+          mkdir -p ai-photoshoot-v2/assets/styles
+          curl -L --fail --retry 3 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=700&q=80' -o ai-photoshoot-v2/assets/styles/business.jpg
+          curl -L --fail --retry 3 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=700&q=80' -o ai-photoshoot-v2/assets/styles/linkedin.jpg
+          curl -L --fail --retry 3 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=700&q=80' -o ai-photoshoot-v2/assets/styles/luxury.jpg
+          curl -L --fail --retry 3 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=700&q=80' -o ai-photoshoot-v2/assets/styles/casual.jpg
+          curl -L --fail --retry 3 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=700&q=80' -o ai-photoshoot-v2/assets/styles/travel.jpg
+          curl -L --fail --retry 3 'https://images.unsplash.com/photo-1504593811423-6dd665756598?auto=format&fit=crop&w=700&q=80' -o ai-photoshoot-v2/assets/styles/editorial.jpg
+          curl -L --fail --retry 3 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=700&q=80' -o ai-photoshoot-v2/assets/styles/creative.jpg
+          curl -L --fail --retry 3 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=700&q=80' -o ai-photoshoot-v2/assets/styles/dating.jpg
+          file ai-photoshoot-v2/assets/styles/*.jpg
+      - name: Switch app to local images
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('ai-photoshoot-v2/index.html')
+          s=p.read_text(encoding='utf-8')
+          repl={
+          'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=700&q=80':'assets/styles/business.jpg',
+          'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=700&q=80':'assets/styles/linkedin.jpg',
+          'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=700&q=80':'assets/styles/luxury.jpg',
+          'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=700&q=80':'assets/styles/casual.jpg',
+          'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=700&q=80':'assets/styles/travel.jpg',
+          'https://images.unsplash.com/photo-1504593811423-6dd665756598?auto=format&fit=crop&w=700&q=80':'assets/styles/editorial.jpg',
+          'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=700&q=80':'assets/styles/creative.jpg',
+          'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=700&q=80':'assets/styles/dating.jpg'
+          }
+          for a,b in repl.items(): s=s.replace(a,b)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit cached assets
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ai-photoshoot-v2/index.html ai-photoshoot-v2/assets/styles
+          git commit -m 'Cache style images locally' || exit 0
+          git push
